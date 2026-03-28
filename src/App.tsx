@@ -6,9 +6,14 @@ import { files } from './files';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 
+const DEFAULT_CONTAINER_HEIGHT = 320;
+const MIN_CONTAINER_HEIGHT = 100;
+const MIN_TERMINAL_HEIGHT = 80;
+
 function App() {
   const [webContainer, setWebContainer] = useState<WebContainer | null>(null);
   const [content, setContent] = useState(files['index.js'].file.contents);
+  const [containerHeight, setContainerHeight] = useState(DEFAULT_CONTAINER_HEIGHT);
 
   const booted = useRef(false);
   const iframeEl = useRef<HTMLIFrameElement>(null);
@@ -16,6 +21,7 @@ function App() {
   const fitAddonRef = useRef<FitAddon | null>(null);
   const shellProcessRef = useRef<Awaited<ReturnType<WebContainer['spawn']>> | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
+  const dragState = useRef<{ startY: number; startHeight: number } | null>(null);
 
   const startShell = useCallback(async (container: WebContainer, terminal: Terminal) => {
     const shellProcess = await container.spawn('jsh', {
@@ -40,6 +46,14 @@ function App() {
     return shellProcess;
   }, []);
 
+  const fitTerminal = useCallback(() => {
+    fitAddonRef.current?.fit();
+    shellProcessRef.current?.resize({
+      cols: terminalRef.current?.cols ?? 0,
+      rows: terminalRef.current?.rows ?? 0,
+    });
+  }, []);
+
   const handleContentChange = useCallback(
     async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       setContent(e.target.value);
@@ -47,6 +61,36 @@ function App() {
       await webContainer.fs.writeFile('index.js', e.target.value);
     },
     [webContainer],
+  );
+
+  const handleDragMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      dragState.current = { startY: e.clientY, startHeight: containerHeight };
+
+      const onMouseMove = (e: MouseEvent) => {
+        if (!dragState.current) return;
+        const delta = e.clientY - dragState.current.startY;
+        const newHeight = dragState.current.startHeight + delta;
+        const maxHeight = window.innerHeight - MIN_TERMINAL_HEIGHT;
+        setContainerHeight(Math.max(MIN_CONTAINER_HEIGHT, Math.min(newHeight, maxHeight)));
+      };
+
+      const onMouseUp = () => {
+        dragState.current = null;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        fitTerminal();
+      };
+
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    },
+    [containerHeight, fitTerminal],
   );
 
   useEffect(() => {
@@ -60,15 +104,12 @@ function App() {
       const fitAddon = new FitAddon();
       fitAddonRef.current = fitAddon;
 
-      const terminal = new Terminal({
-        convertEol: true,
-      });
+      const terminal = new Terminal({ convertEol: true });
       terminalRef.current = terminal;
 
       if (terminalEl.current) {
         terminal.loadAddon(fitAddon);
         terminal.open(terminalEl.current);
-
         fitAddon.fit();
       }
 
@@ -85,19 +126,12 @@ function App() {
   }, [startShell]);
 
   useEffect(() => {
-    const handleResize = () => {
-      fitAddonRef.current?.fit();
-      shellProcessRef.current?.resize({
-        cols: terminalRef.current?.cols ?? 0,
-        rows: terminalRef.current?.rows ?? 0,
-      });
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    window.addEventListener('resize', fitTerminal);
+    return () => window.removeEventListener('resize', fitTerminal);
+  }, [fitTerminal]);
 
   return (
-    <>
+    <div className='layout'>
       <header>
         <h1>
           Hello, <span className='wc'>WebContainers API</span>!
@@ -108,7 +142,7 @@ function App() {
           </a>
         </p>
       </header>
-      <div className='container'>
+      <div className='container' style={{ height: containerHeight }}>
         <div className='editor'>
           <textarea value={content} onChange={handleContentChange}>
             I am a textarea
@@ -118,8 +152,13 @@ function App() {
           <iframe ref={iframeEl} src='loading.html'></iframe>
         </div>
       </div>
-      <div className='terminal' ref={terminalEl}></div>
-    </>
+      <div className='drag-handle' onMouseDown={handleDragMouseDown}>
+        <div className='drag-handle-bar' />
+      </div>
+      <div className='terminal-wrapper'>
+        <div className='terminal' ref={terminalEl}></div>
+      </div>
+    </div>
   );
 }
 

@@ -17,8 +17,8 @@
 
 body {
   margin: 0;
-  padding: 0.75rem 1.25rem;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font-family:
@@ -31,6 +31,19 @@ body {
     radial-gradient(ellipse at 20% 0%, rgba(108, 99, 255, 0.08) 0%, transparent 60%),
     radial-gradient(ellipse at 80% 0%, rgba(0, 212, 255, 0.06) 0%, transparent 60%);
 }
+
+#root {
+  height: 100%;
+}
+
+.layout {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 1.25rem;
+}
+
+/* ── Header ── */
 
 header {
   text-align: center;
@@ -52,7 +65,6 @@ header h1 {
   font-size: 1.6rem;
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: var(--text);
 }
 
 .wc {
@@ -76,7 +88,10 @@ header a.docs {
   border-radius: 20px;
   font-size: 0.8rem;
   letter-spacing: 0.03em;
-  transition: color 0.2s, border-color 0.2s, box-shadow 0.2s;
+  transition:
+    color 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 header a.docs:hover {
@@ -85,35 +100,44 @@ header a.docs:hover {
   box-shadow: 0 0 12px var(--cyan-glow);
 }
 
-.container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  width: 100%;
-}
+/* ── Panels ── */
 
 .editor,
-.preview {
+.preview,
+.terminal-wrapper {
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
   background: var(--surface);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-  position: relative;
+}
+
+.editor::before,
+.preview::before,
+.terminal-wrapper::before {
+  content: '';
+  display: block;
+  height: 2px;
+  opacity: 0.7;
 }
 
 .editor::before,
 .preview::before {
-  content: '';
-  display: block;
-  height: 2px;
   background: linear-gradient(90deg, var(--accent), var(--cyan));
-  opacity: 0.7;
+}
+
+/* ── Editor / Preview ── */
+
+.container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  flex-shrink: 0;
 }
 
 textarea {
   width: 100%;
-  height: 20rem;
+  height: 100%;
   resize: none;
   background: transparent;
   color: #c8c8ff;
@@ -130,27 +154,60 @@ textarea:focus {
 }
 
 iframe {
-  height: 20rem;
+  height: 100%;
   width: 100%;
   border: none;
   display: block;
   background: #fff;
 }
 
-.terminal {
-  margin-top: 1rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--surface);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), inset 0 0 40px rgba(0, 0, 0, 0.2);
-  position: relative;
+/* ── Drag handle ── */
+
+.drag-handle {
+  flex-shrink: 0;
+  height: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: row-resize;
+  margin: 0.75rem 0 0.25rem;
 }
 
-.terminal::before {
-  content: '';
-  display: block;
-  height: 2px;
+.drag-handle:hover .drag-handle-bar,
+.drag-handle:active .drag-handle-bar {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.drag-handle-bar {
+  width: 48px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--text-muted);
+  transition:
+    background 0.2s,
+    box-shadow 0.2s;
+}
+
+/* ── Terminal ── */
+
+.terminal-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    inset 0 0 40px rgba(0, 0, 0, 0.2);
+}
+
+.terminal-wrapper::before {
+  flex-shrink: 0;
   background: linear-gradient(90deg, var(--cyan), var(--accent));
-  opacity: 0.7;
+}
+
+.terminal {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
