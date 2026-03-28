@@ -98,6 +98,16 @@ function App() {
 
   return (
     <>
+      <header>
+        <h1>
+          Hello, <span className='wc'>WebContainers API</span>!
+        </h1>
+        <p>
+          <a className='docs' href='https://webcontainers.io' target='_blank' rel='noreferrer noopener'>
+            Read the docs 📚
+          </a>
+        </p>
+      </header>
       <div className='container'>
         <div className='editor'>
           <textarea value={content} onChange={handleContentChange}>
