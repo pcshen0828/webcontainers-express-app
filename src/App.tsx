@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
+import '@xterm/xterm/css/xterm.css';
 import { WebContainer } from '@webcontainer/api';
 import { files } from './files';
+import { Terminal } from '@xterm/xterm';
 
 function App() {
   const [webContainer, setWebContainer] = useState<WebContainer | null>(null);
@@ -9,14 +11,15 @@ function App() {
 
   const booted = useRef(false);
   const iframeEl = useRef<HTMLIFrameElement>(null);
+  const terminalEl = useRef<HTMLDivElement>(null);
 
-  const installDependencies = useCallback(async (container: WebContainer) => {
+  const installDependencies = useCallback(async (container: WebContainer, terminal: Terminal) => {
     const installProcess = await container.spawn('npm', ['install']);
 
     installProcess.output.pipeTo(
       new WritableStream({
         write(data) {
-          console.log(data);
+          terminal.write(data);
         },
       }),
     );
@@ -25,9 +28,17 @@ function App() {
     return installProcess.exit;
   }, []);
 
-  const startDevServer = useCallback(async (container: WebContainer) => {
+  const startDevServer = useCallback(async (container: WebContainer, terminal: Terminal) => {
     // Run `npm run start` to start the Express app
-    await container.spawn('npm', ['run', 'start']);
+    const serverProcess = await container.spawn('npm', ['run', 'start']);
+
+    serverProcess.output.pipeTo(
+      new WritableStream({
+        write(data) {
+          terminal.write(data);
+        },
+      }),
+    );
 
     // Wait for `server-ready` event
     container.on('server-ready', (_, url) => {
@@ -50,14 +61,22 @@ function App() {
       booted.current = true;
       const webContainer = await WebContainer.boot();
       setWebContainer(webContainer);
+
+      const terminal = new Terminal({
+        convertEol: true,
+      });
+      if (terminalEl.current) {
+        terminal.open(terminalEl.current);
+      }
+
       await webContainer.mount(files);
 
-      const exitCode = await installDependencies(webContainer);
+      const exitCode = await installDependencies(webContainer, terminal);
       if (exitCode !== 0) {
         throw new Error('Installation failed');
       }
 
-      await startDevServer(webContainer);
+      await startDevServer(webContainer, terminal);
     };
 
     if (booted.current) return;
@@ -76,6 +95,7 @@ function App() {
           <iframe ref={iframeEl} src='loading.html'></iframe>
         </div>
       </div>
+      <div className='terminal' ref={terminalEl}></div>
     </>
   );
 }
