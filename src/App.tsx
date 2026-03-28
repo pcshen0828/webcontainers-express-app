@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
 import { WebContainer } from '@webcontainer/api';
 import { files } from './files';
 
 function App() {
+  const [webContainer, setWebContainer] = useState<WebContainer | null>(null);
+  const [content, setContent] = useState(files['index.js'].file.contents);
+
   const booted = useRef(false);
   const iframeEl = useRef<HTMLIFrameElement>(null);
 
@@ -33,10 +36,20 @@ function App() {
     });
   }, []);
 
+  const handleContentChange = useCallback(
+    async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setContent(e.target.value);
+      if (!webContainer) return;
+      await webContainer.fs.writeFile('index.js', e.target.value);
+    },
+    [webContainer],
+  );
+
   useEffect(() => {
     const initWebContainer = async () => {
       booted.current = true;
       const webContainer = await WebContainer.boot();
+      setWebContainer(webContainer);
       await webContainer.mount(files);
 
       const exitCode = await installDependencies(webContainer);
@@ -55,7 +68,9 @@ function App() {
     <>
       <div className='container'>
         <div className='editor'>
-          <textarea value={files['index.js'].file.contents}>I am a textarea</textarea>
+          <textarea value={content} onChange={handleContentChange}>
+            I am a textarea
+          </textarea>
         </div>
         <div className='preview'>
           <iframe ref={iframeEl} src='loading.html'></iframe>
