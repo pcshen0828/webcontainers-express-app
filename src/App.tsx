@@ -13,10 +13,9 @@ function App() {
   const iframeEl = useRef<HTMLIFrameElement>(null);
   const terminalEl = useRef<HTMLDivElement>(null);
 
-  const installDependencies = useCallback(async (container: WebContainer, terminal: Terminal) => {
-    const installProcess = await container.spawn('npm', ['install']);
-
-    installProcess.output.pipeTo(
+  const startShell = useCallback(async (container: WebContainer, terminal: Terminal) => {
+    const shellProcess = await container.spawn('jsh');
+    shellProcess.output.pipeTo(
       new WritableStream({
         write(data) {
           terminal.write(data);
@@ -24,27 +23,12 @@ function App() {
       }),
     );
 
-    // Wait for install command to exit
-    return installProcess.exit;
-  }, []);
-
-  const startDevServer = useCallback(async (container: WebContainer, terminal: Terminal) => {
-    // Run `npm run start` to start the Express app
-    const serverProcess = await container.spawn('npm', ['run', 'start']);
-
-    serverProcess.output.pipeTo(
-      new WritableStream({
-        write(data) {
-          terminal.write(data);
-        },
-      }),
-    );
-
-    // Wait for `server-ready` event
-    container.on('server-ready', (_, url) => {
-      if (!iframeEl.current) return;
-      iframeEl.current.src = url;
+    const input = shellProcess.input.getWriter();
+    terminal.onData((data) => {
+      input.write(data);
     });
+
+    return shellProcess;
   }, []);
 
   const handleContentChange = useCallback(
@@ -59,8 +43,10 @@ function App() {
   useEffect(() => {
     const initWebContainer = async () => {
       booted.current = true;
+
       const webContainer = await WebContainer.boot();
       setWebContainer(webContainer);
+      await webContainer.mount(files);
 
       const terminal = new Terminal({
         convertEol: true,
@@ -69,19 +55,17 @@ function App() {
         terminal.open(terminalEl.current);
       }
 
-      await webContainer.mount(files);
+      webContainer.on('server-ready', (_, url) => {
+        if (!iframeEl.current) return;
+        iframeEl.current.src = url;
+      });
 
-      const exitCode = await installDependencies(webContainer, terminal);
-      if (exitCode !== 0) {
-        throw new Error('Installation failed');
-      }
-
-      await startDevServer(webContainer, terminal);
+      startShell(webContainer, terminal);
     };
 
     if (booted.current) return;
     initWebContainer();
-  }, [installDependencies, startDevServer]);
+  }, [startShell]);
 
   return (
     <>
