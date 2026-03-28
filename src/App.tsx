@@ -4,6 +4,7 @@ import '@xterm/xterm/css/xterm.css';
 import { WebContainer } from '@webcontainer/api';
 import { files } from './files';
 import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
 
 function App() {
   const [webContainer, setWebContainer] = useState<WebContainer | null>(null);
@@ -12,9 +13,17 @@ function App() {
   const booted = useRef(false);
   const iframeEl = useRef<HTMLIFrameElement>(null);
   const terminalEl = useRef<HTMLDivElement>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const shellProcessRef = useRef<Awaited<ReturnType<WebContainer['spawn']>> | null>(null);
+  const terminalRef = useRef<Terminal | null>(null);
 
   const startShell = useCallback(async (container: WebContainer, terminal: Terminal) => {
-    const shellProcess = await container.spawn('jsh');
+    const shellProcess = await container.spawn('jsh', {
+      terminal: {
+        cols: terminal.cols,
+        rows: terminal.rows,
+      },
+    });
     shellProcess.output.pipeTo(
       new WritableStream({
         write(data) {
@@ -48,11 +57,19 @@ function App() {
       setWebContainer(webContainer);
       await webContainer.mount(files);
 
+      const fitAddon = new FitAddon();
+      fitAddonRef.current = fitAddon;
+
       const terminal = new Terminal({
         convertEol: true,
       });
+      terminalRef.current = terminal;
+
       if (terminalEl.current) {
+        terminal.loadAddon(fitAddon);
         terminal.open(terminalEl.current);
+
+        fitAddon.fit();
       }
 
       webContainer.on('server-ready', (_, url) => {
@@ -60,12 +77,24 @@ function App() {
         iframeEl.current.src = url;
       });
 
-      startShell(webContainer, terminal);
+      shellProcessRef.current = await startShell(webContainer, terminal);
     };
 
     if (booted.current) return;
     initWebContainer();
   }, [startShell]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      fitAddonRef.current?.fit();
+      shellProcessRef.current?.resize({
+        cols: terminalRef.current?.cols ?? 0,
+        rows: terminalRef.current?.rows ?? 0,
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
     <>
