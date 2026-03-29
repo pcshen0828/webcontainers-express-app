@@ -1,0 +1,1850 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Introducing WebContainers</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #0a0a0f;
+        --surface: #10101a;
+        --border: #2a2a4a;
+        --accent: #6c63ff;
+        --accent-glow: rgba(108, 99, 255, 0.25);
+        --cyan: #00d4ff;
+        --cyan-glow: rgba(0, 212, 255, 0.15);
+        --text: #eeeeff;
+        --text-muted: #9898c8;
+        --font-mono: 'Fira Code', 'Cascadia Code', monospace;
+        --font-ui: 'Inter', 'Noto Sans TC', system-ui, sans-serif;
+      }
+
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-ui);
+      }
+
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        background:
+          radial-gradient(ellipse at 20% 0%, rgba(108, 99, 255, 0.08) 0%, transparent 60%),
+          radial-gradient(ellipse at 80% 0%, rgba(0, 212, 255, 0.06) 0%, transparent 60%);
+      }
+
+      /* ── Language switching ──────────────────────── */
+      body.zh {
+        font-family: 'Noto Sans TC', 'Inter', system-ui, sans-serif;
+      }
+      .t-zh {
+        display: none;
+      }
+      body.zh .t-en {
+        display: none;
+      }
+      body.zh .t-zh {
+        display: revert;
+      }
+
+      /* ── Language toggle ─────────────────────────── */
+      .lang-toggle {
+        position: fixed;
+        top: 1.25rem;
+        left: 1.5rem;
+        display: flex;
+        gap: 0;
+        z-index: 100;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+      }
+      .lang-btn {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 0.72rem;
+        font-family: var(--font-mono);
+        letter-spacing: 0.05em;
+        padding: 0.3rem 0.8rem;
+        transition:
+          color 0.2s,
+          background 0.2s;
+      }
+      .lang-btn.active {
+        background: var(--accent);
+        color: white;
+      }
+      .lang-sep {
+        width: 1px;
+        background: var(--border);
+        align-self: stretch;
+      }
+
+      /* ── Slide system ────────────────────────────── */
+      .slide {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 2.5rem 5vw 5rem;
+        z-index: 1;
+        opacity: 0;
+        transform: translateY(var(--enter-dir, 24px));
+        pointer-events: none;
+        transition:
+          opacity 0.35s ease,
+          transform 0.35s ease;
+      }
+      .slide::before,
+      .slide::after {
+        content: '';
+        flex: 1 0 0;
+      }
+      .slide[data-active] {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: all;
+        overflow-y: auto;
+      }
+      .slide[data-exiting] {
+        opacity: 0;
+        transform: translateY(var(--exit-dir, -24px));
+        pointer-events: none;
+        transition:
+          opacity 0.28s ease,
+          transform 0.28s ease;
+      }
+
+      /* ── Typography ──────────────────────────────── */
+      h1 {
+        font-size: clamp(2.2rem, 5vw, 3.8rem);
+        font-weight: 600;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+      }
+      h2 {
+        font-size: clamp(1.4rem, 2.8vw, 2.2rem);
+        font-weight: 600;
+        line-height: 1.2;
+        letter-spacing: -0.01em;
+      }
+      h3 {
+        font-size: clamp(1rem, 1.6vw, 1.2rem);
+        font-weight: 500;
+      }
+      p {
+        font-size: clamp(0.95rem, 1.45vw, 1.05rem);
+        line-height: 1.7;
+        color: #c8c8d8;
+      }
+      .lead {
+        font-size: clamp(1.02rem, 1.6vw, 1.18rem);
+        color: var(--text);
+        line-height: 1.65;
+      }
+      .grad {
+        background: linear-gradient(135deg, var(--accent), var(--cyan));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .muted {
+        color: var(--text-muted);
+      }
+      .mono {
+        font-family: var(--font-mono);
+      }
+      .mt-xs {
+        margin-top: 0.35rem;
+      }
+      .text-dim {
+        color: #c8c8d8;
+      }
+      .cta-btn:hover {
+        opacity: 0.85;
+      }
+
+      /* ── Card ────────────────────────────────────── */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+      }
+      .card-bar,
+      .pipe-bar,
+      .progress-fill {
+        background: linear-gradient(90deg, var(--accent), var(--cyan));
+      }
+      .card-bar {
+        height: 2px;
+      }
+
+      /* ── Code ────────────────────────────────────── */
+      pre,
+      code {
+        font-family: var(--font-mono);
+        font-size: clamp(0.76rem, 1.05vw, 0.88rem);
+        line-height: 1.75;
+      }
+      pre {
+        background: #080810;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 1rem 1.3rem;
+        text-align: left;
+        overflow-x: auto;
+        box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.3);
+        color: #d8d8ff;
+      }
+      code {
+        background: rgba(108, 99, 255, 0.12);
+        padding: 0.1em 0.4em;
+        border-radius: 4px;
+        color: var(--accent);
+        font-size: 0.88em;
+      }
+      .tok-kw {
+        color: #ae8eff;
+      }
+      .tok-fn {
+        color: #ae8eff;
+      }
+      .tok-str {
+        color: #89ddff;
+      }
+      .tok-cm {
+        color: #6a6a9e;
+        font-style: italic;
+      }
+      .tok-num {
+        color: #89ddff;
+      }
+      .tok-prop {
+        color: #d8d8ff;
+      }
+      .tok-cls {
+        color: #d8d8ff;
+      }
+
+      /* ── Bullets ─────────────────────────────────── */
+      .bullets {
+        list-style: none;
+        text-align: left;
+      }
+      .bullets li {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.7rem;
+        margin-bottom: 0.7rem;
+        font-size: clamp(0.95rem, 1.42vw, 1.05rem);
+        line-height: 1.6;
+      }
+      .bullets li::before {
+        content: '▸';
+        color: var(--accent);
+        flex-shrink: 0;
+        margin-top: 0.15em;
+      }
+
+      /* ── Terminal mockup ─────────────────────────── */
+      .term-mock {
+        background: #080810;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 32px rgba(0, 0, 0, 0.5);
+      }
+      .term-bar {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 0.5rem 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .term-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+      }
+      .term-dot.r {
+        background: #ff5f57;
+      }
+      .term-dot.y {
+        background: #febc2e;
+      }
+      .term-dot.g {
+        background: #28c840;
+      }
+      .term-label {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        margin-left: 0.4rem;
+      }
+      .term-body {
+        padding: 0.9rem 1.2rem;
+        font-family: var(--font-mono);
+        font-size: clamp(0.72rem, 1vw, 0.82rem);
+        line-height: 1.85;
+      }
+      .term-prompt {
+        color: var(--cyan);
+      }
+      .term-cmd {
+        color: var(--text);
+      }
+      .term-out {
+        color: var(--text-muted);
+      }
+
+      /* ── Code card ───────────────────────────────── */
+      .code-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .code-tab {
+        background: #0d0d18;
+        border-bottom: 1px solid var(--border);
+        padding: 0.42rem 1rem;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        color: var(--text-muted);
+      }
+
+      /* ── Controls HUD ────────────────────────────── */
+      .controls {
+        position: fixed;
+        bottom: 1.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 1.25rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0.42rem 1.4rem;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+        z-index: 100;
+      }
+.controls button {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 1rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        transition:
+          color 0.2s,
+          background 0.2s;
+        line-height: 1;
+      }
+      .controls button:disabled {
+        opacity: 0.25;
+        cursor: default;
+        pointer-events: none;
+      }
+      .controls button:hover {
+        color: var(--cyan);
+        background: var(--cyan-glow);
+      }
+      #slide-counter {
+        color: var(--text-muted);
+        font-size: 0.74rem;
+        font-family: var(--font-mono);
+        letter-spacing: 0.06em;
+        min-width: 3em;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        gap: 0.15em;
+      }
+      #page-input {
+        background: none;
+        border: none;
+        border-bottom: 1px solid transparent;
+        color: var(--text-muted);
+        font-size: 0.74rem;
+        font-family: var(--font-mono);
+        letter-spacing: 0.06em;
+        width: 2em;
+        text-align: center;
+        outline: none;
+        padding: 0;
+        -moz-appearance: textfield;
+        appearance: textfield;
+        transition:
+          color 0.2s,
+          border-color 0.2s;
+      }
+      #page-input::-webkit-outer-spin-button,
+      #page-input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+      }
+      #page-input:focus {
+        color: var(--cyan);
+        border-bottom-color: var(--cyan);
+      }
+      .page-sep {
+        color: var(--text-muted);
+        font-size: 0.74rem;
+        font-family: var(--font-mono);
+      }
+
+      /* ── Progress bar ────────────────────────────── */
+      .progress-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--border);
+        z-index: 100;
+      }
+      .progress-fill {
+        height: 100%;
+        transition: width 0.35s ease;
+      }
+
+      /* ── Animations ──────────────────────────────── */
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0) rotate(-4deg);
+        }
+        50% {
+          transform: translateY(-22px) rotate(4deg);
+        }
+      }
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0;
+        }
+      }
+      .cursor {
+        display: inline-block;
+        width: 8px;
+        height: 1em;
+        background: var(--cyan);
+        vertical-align: text-bottom;
+        animation: blink 1s step-end infinite;
+      }
+
+      /* ── Badge ───────────────────────────────────── */
+      .badge {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        padding: 0.28em 0.75em;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        color: var(--text-muted);
+        background: var(--surface);
+      }
+
+      /* ════════════════════════════════════════════════
+       SLIDE LAYOUTS
+       ════════════════════════════════════════════════ */
+
+      /* S1 */
+      .s1-bolt {
+        position: absolute;
+        right: 8vw;
+        top: 50%;
+        transform: translateY(-50%) rotate(-4deg);
+        opacity: 0.07;
+        width: clamp(160px, 20vw, 300px);
+        animation: float 8s ease-in-out infinite;
+        pointer-events: none;
+      }
+      .s1-eyebrow {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        color: var(--accent);
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
+      }
+      .s1-sub {
+        font-size: clamp(1rem, 1.8vw, 1.4rem);
+        color: var(--text-muted);
+        margin: 0.75rem 0 1.75rem;
+      }
+      .s1-stack {
+        display: flex;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-bottom: 2rem;
+      }
+      .s1-stack .badge {
+        color: var(--text);
+      }
+      .s1-hint {
+        font-family: var(--font-mono);
+        font-size: 0.74rem;
+        color: var(--text-muted);
+      }
+      .s1-hint kbd {
+        display: inline-block;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 0.1em 0.5em;
+        font-family: var(--font-mono);
+        color: var(--text);
+        font-size: 0.74rem;
+      }
+
+      /* S2 */
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        align-items: center;
+        width: 100%;
+        max-width: 1100px;
+        text-align: left;
+      }
+      .two-col h2 {
+        margin-bottom: 0.85rem;
+      }
+
+      /* S3 pipeline */
+      .pipeline {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        max-width: 1100px;
+        margin-top: 1.5rem;
+      }
+      .pipe-step {
+        flex: 1;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        text-align: center;
+      }
+      .pipe-bar {
+        height: 2px;
+      }
+      .pipe-body {
+        padding: 1rem 0.65rem;
+      }
+      .pipe-num,
+      .arch-label,
+      .api-group-label {
+        font-family: var(--font-mono);
+        font-size: 0.62rem;
+        color: var(--accent);
+      }
+      .pipe-num {
+        letter-spacing: 0.1em;
+        margin-bottom: 0.35rem;
+      }
+      .pipe-icon {
+        font-size: 1.4rem;
+        margin-bottom: 0.35rem;
+      }
+      .pipe-step h3 {
+        font-size: 1rem;
+        margin-bottom: 0.25rem;
+      }
+      .pipe-step p {
+        font-size: 0.82rem;
+      }
+      .pipe-step code {
+        font-size: 0.76rem;
+      }
+      .pipe-arrow {
+        color: var(--border);
+        font-size: 1rem;
+        padding: 0 0.35rem;
+        flex-shrink: 0;
+      }
+
+      /* S4 arch */
+      .arch-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        width: 100%;
+        max-width: 1100px;
+        margin-top: 1.1rem;
+      }
+      .arch-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1rem 1.2rem;
+        text-align: left;
+        transition: border-color 0.2s;
+      }
+      .arch-card:hover {
+        border-color: var(--accent);
+      }
+      .arch-label {
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 0.35rem;
+      }
+      .arch-card h3 {
+        font-size: 1rem;
+        margin-bottom: 0.35rem;
+      }
+      .arch-card p {
+        font-size: 0.88rem;
+      }
+
+      /* S5 fs */
+      .fs-layout {
+        display: grid;
+        grid-template-columns: 1fr 1.5fr;
+        gap: 1.4rem;
+        align-items: start;
+        width: 100%;
+        max-width: 1100px;
+        margin-top: 1.1rem;
+      }
+      .fs-layout .code-card pre {
+        max-height: 20vh;
+        overflow-y: auto;
+      }
+      .api-group {
+        margin-bottom: 0.85rem;
+      }
+      .api-group-label {
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 0.3rem;
+      }
+
+      /* S6 proc */
+      .proc-layout {
+        display: grid;
+        grid-template-columns: 1fr 1.4fr;
+        gap: 1.4rem;
+        align-items: start;
+        width: 100%;
+        max-width: 1100px;
+        margin-top: 1.1rem;
+      }
+      .net-mini {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+        margin-top: 0.75rem;
+      }
+      .net-row {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      .net-box {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 0.38rem 0.75rem;
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        color: var(--text);
+        min-width: 0;
+        word-break: break-word;
+      }
+      .net-box.accent {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: rgba(108, 99, 255, 0.08);
+      }
+      .net-box.cyan {
+        border-color: var(--cyan);
+        color: var(--cyan);
+        background: rgba(0, 212, 255, 0.07);
+      }
+      .net-box.green {
+        border-color: #4ade80;
+        color: #4ade80;
+        background: rgba(74, 222, 128, 0.07);
+      }
+      .net-arrow-sm {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+      }
+
+      /* S7 networking */
+      .net-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.4rem;
+        align-items: start;
+        width: 100%;
+        max-width: 1100px;
+        margin-top: 1.1rem;
+        text-align: left;
+      }
+      .net-diagram {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      /* S8 headers */
+      .headers-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.3rem;
+        width: 100%;
+        max-width: 1100px;
+        margin-top: 1rem;
+      }
+      .warn-badge {
+        margin-top: 1rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        background: rgba(255, 200, 0, 0.07);
+        border: 1px solid rgba(255, 200, 0, 0.2);
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        font-size: 0.77rem;
+        color: #ffc840;
+        font-family: var(--font-mono);
+        word-break: break-word;
+      }
+
+      /* S9 use cases */
+      .usecases-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.9rem;
+        width: 100%;
+        max-width: 1100px;
+        margin-top: 1.25rem;
+      }
+      .uc {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        transition: border-color 0.2s;
+      }
+      .uc:hover {
+        border-color: var(--cyan);
+      }
+      .uc-icon {
+        padding: 0.9rem 1rem 0.45rem;
+        font-size: 1.5rem;
+      }
+      .uc-body {
+        padding: 0 1rem 0.9rem;
+        text-align: left;
+      }
+      .uc h3 {
+        font-size: 0.95rem;
+        color: var(--cyan);
+        margin-bottom: 0.25rem;
+      }
+      .uc p {
+        font-size: 0.85rem;
+        line-height: 1.55;
+      }
+
+      .thank-you-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        text-align: center;
+        gap: 1.5rem;
+      }
+      .thank-you-wrap h2 { font-size: clamp(2.5rem, 6vw, 5rem); }
+      .ty-sub { font-size: clamp(0.75rem, 1.5vw, 1rem); opacity: 0.75; margin: 0; }
+
+      /* ── Prevent grid cells from stretching past column width ── */
+      .two-col > *,
+      .fs-layout > *,
+      .proc-layout > *,
+      .net-layout > *,
+      .headers-grid > * {
+        min-width: 0;
+      }
+
+      /* ── Tablet: collapse dense layouts early ───── */
+      @media (max-width: 960px) {
+        .slide {
+          padding-top: 3.5rem;
+        }
+        .fs-layout,
+        .proc-layout,
+        .net-layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* ── Mobile ──────────────────────────────────── */
+      @media (max-width: 768px) {
+        .slide {
+          padding: 3.5rem 4vw 5rem;
+        }
+        .two-col,
+        .arch-grid,
+        .fs-layout,
+        .proc-layout,
+        .net-layout,
+        .headers-grid {
+          grid-template-columns: 1fr;
+        }
+        .pipeline {
+          flex-direction: column;
+        }
+        .pipe-arrow {
+          transform: rotate(90deg);
+        }
+        .usecases-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ── Language toggle ──────────────────────────────────── -->
+    <div class="lang-toggle">
+      <button class="lang-btn active" id="btn-en" onclick="setLang('en')">EN</button>
+      <div class="lang-sep"></div>
+      <button class="lang-btn" id="btn-zh" onclick="setLang('zh')">中文</button>
+    </div>
+
+    <!-- ══ SLIDE 1 — Title ══════════════════════════════════════ -->
+    <section class="slide" id="slide-1" aria-label="Slide 1 of 12">
+      <svg class="s1-bolt" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 46" aria-hidden="true">
+        <path
+          fill="#863bff"
+          d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z"
+        />
+      </svg>
+      <p class="s1-eyebrow">StackBlitz · @webcontainer/api</p>
+      <h1>
+        <span class="t-en">Introducing<br /><span class="grad">WebContainers</span></span>
+        <span class="t-zh">介紹<br /><span class="grad">WebContainers</span></span>
+      </h1>
+      <p class="s1-sub">
+        <span class="t-en">A complete OS for the browser — built on WebAssembly.</span>
+        <span class="t-zh">為瀏覽器打造的完整執行環境，以 WebAssembly 為核心。</span>
+      </p>
+      <div class="s1-stack">
+        <span class="badge"
+          ><span class="t-en">Node.js in the browser</span><span class="t-zh">瀏覽器中的 Node.js</span></span
+        >
+        <span class="badge">WebAssembly</span>
+        <span class="badge"><span class="t-en">No server required</span><span class="t-zh">無需後端伺服器</span></span>
+      </div>
+      <p class="s1-hint">
+        <span class="t-en">press <kbd>→</kbd> to continue</span>
+        <span class="t-zh">按 <kbd>→</kbd> 繼續</span>
+      </p>
+    </section>
+
+    <!-- ══ SLIDE 2 — Why WebContainers? ════════════════════════ -->
+    <section class="slide" id="slide-2" aria-label="Slide 2 of 12" aria-hidden="true">
+      <h2>
+        <span class="t-en">The <span class="grad">Problem</span> with Traditional Approaches</span>
+        <span class="t-zh">傳統方案的<span class="grad">痛點</span></span>
+      </h2>
+      <p class="mt-xs">
+        <span class="t-en">Cloud VM sandboxes work, but come with serious trade-offs.</span>
+        <span class="t-zh">Cloud VM 沙盒雖然可行，但帶來了不少代價。</span>
+      </p>
+      <div class="arch-grid" style="margin-top: 1.25rem">
+        <div class="arch-card" style="border-color: rgba(255, 80, 80, 0.25)">
+          <div class="arch-label" style="color: #ff6b6b">
+            <span class="t-en">Traditional Cloud VM</span><span class="t-zh">傳統 Cloud VM</span>
+          </div>
+          <ul class="bullets" style="margin-top: 0.25rem">
+            <li class="text-dim">
+              <span class="t-en">Network round-trips on every action — noticeable latency</span
+              ><span class="t-zh">每個操作都需網路往返，延遲明顯</span>
+            </li>
+            <li class="text-dim">
+              <span class="t-en">Expensive server infrastructure that must scale with users</span
+              ><span class="t-zh">需要昂貴的伺服器基礎設施，隨使用者數量增加</span>
+            </li>
+            <li class="text-dim">
+              <span class="t-en">User code runs on shared servers — security risk</span
+              ><span class="t-zh">使用者程式碼跑在共享伺服器上，存在安全風險</span>
+            </li>
+            <li class="text-dim">
+              <span class="t-en">Slow boot time — spinning up VMs takes seconds</span
+              ><span class="t-zh">啟動緩慢，開啟 VM 需要數秒</span>
+            </li>
+          </ul>
+        </div>
+        <div class="arch-card" style="border-color: rgba(108, 99, 255, 0.4)">
+          <div class="arch-label">WebContainers</div>
+          <ul class="bullets" style="margin-top: 0.25rem">
+            <li class="text-dim">
+              <span class="t-en"><strong>Zero latency</strong> — everything runs locally in the browser tab</span
+              ><span class="t-zh"><strong>零延遲</strong>——所有運算直接在瀏覽器分頁內完成</span>
+            </li>
+            <li class="text-dim">
+              <span class="t-en"><strong>No server cost</strong> — uses local compute, distributes via CDN</span
+              ><span class="t-zh"><strong>無伺服器費用</strong>——使用本機運算，透過 CDN 分發</span>
+            </li>
+            <li class="text-dim">
+              <span class="t-en"
+                ><strong>Isolated by design</strong> — runtime contained within the browser sandbox</span
+              ><span class="t-zh"><strong>天然隔離</strong>——執行環境封閉在瀏覽器沙盒內</span>
+            </li>
+            <li class="text-dim">
+              <span class="t-en"><strong>Boots in milliseconds</strong> — no VM provisioning needed</span
+              ><span class="t-zh"><strong>毫秒級啟動</strong>——無需等待 VM 佈建</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <p style="margin-top: 1rem; font-size: 0.85rem">
+        <span class="t-en"
+          >Proven at scale — powering millions of StackBlitz users and the interactive docs of Svelte, Angular, and
+          Nuxt.</span
+        >
+        <span class="t-zh"
+          >已通過大規模驗證——驅動數百萬 StackBlitz 使用者，並支援 Svelte、Angular、Nuxt 的互動式官方文件。</span
+        >
+      </p>
+    </section>
+
+    <!-- ══ SLIDE 3 — What is WebContainers? ════════════════════ -->
+    <section class="slide" id="slide-3" aria-label="Slide 3 of 12" aria-hidden="true">
+      <div class="two-col">
+        <div>
+          <h2>
+            <span class="t-en">What is<br /><span class="grad">WebContainers</span>?</span>
+            <span class="t-zh">什麼是<br /><span class="grad">WebContainers</span>？</span>
+          </h2>
+          <p class="lead" style="margin: 0.85rem 0 1.1rem">
+            <span class="t-en"
+              >A browser-native runtime that executes Node.js, npm, and shell commands entirely inside the browser tab.
+              Built by StackBlitz, it powers StackBlitz.com.</span
+            >
+            <span class="t-zh"
+              >一個瀏覽器原生的執行環境，可直接在瀏覽器分頁內執行 Node.js、npm 與 shell 指令，無需任何後端。由
+              StackBlitz 開發，為 StackBlitz.com 提供技術核心。</span
+            >
+          </p>
+          <ul class="bullets">
+            <li>
+              <span class="t-en">Runs a <strong>real Node.js</strong> runtime — not a polyfill or emulation</span
+              ><span class="t-zh">執行<strong>真正的 Node.js</strong> 執行環境，非模擬或 polyfill 替代實作</span>
+            </li>
+            <li>
+              <span class="t-en">Supports <strong>npm install</strong>, ESM, CJS, and native modules</span
+              ><span class="t-zh">支援 <strong>npm install</strong>、ESM、CJS 及原生模組</span>
+            </li>
+            <li>
+              <span class="t-en"><strong>Virtual filesystem</strong> — mount, read, write, watch files</span
+              ><span class="t-zh"><strong>虛擬檔案系統</strong>——掛載、讀寫與監控檔案變更</span>
+            </li>
+            <li>
+              <span class="t-en"><strong>POSIX-like shell</strong> (jsh) with full I/O streaming</span
+              ><span class="t-zh"><strong>類 POSIX Shell</strong>（jsh），提供完整的 I/O 串流支援</span>
+            </li>
+            <li>
+              <span class="t-en">Servers become reachable via a <strong>Service Worker proxy URL</strong></span
+              ><span class="t-zh">伺服器啟動後，Service Worker 會產生一個<strong>專屬代理網址</strong>供外部存取</span>
+            </li>
+          </ul>
+        </div>
+        <div class="term-mock">
+          <div class="term-bar">
+            <span class="term-dot r"></span><span class="term-dot y"></span><span class="term-dot g"></span>
+            <span class="term-label">WebContainer — jsh</span>
+          </div>
+          <div class="term-body">
+            <div><span class="term-prompt">$ </span><span class="term-cmd">node --version</span></div>
+            <div><span class="term-out">v22.0.0</span></div>
+            <div><span class="term-prompt">$ </span><span class="term-cmd">npm install express</span></div>
+            <div><span class="term-out">added 62 packages in 1.8s</span></div>
+            <div><span class="term-prompt">$ </span><span class="term-cmd">node index.js</span></div>
+            <div><span class="term-out">App is live at http://localhost:3111</span></div>
+            <div><span class="term-prompt">$ </span><span class="cursor"></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ SLIDE 3 — How It Works ══════════════════════════════ -->
+    <section class="slide" id="slide-4" aria-label="Slide 4 of 12" aria-hidden="true">
+      <h2>
+        <span class="t-en">Under the <span class="grad">Hood</span></span>
+        <span class="t-zh">底層<span class="grad">架構</span></span>
+      </h2>
+      <p class="mt-xs">
+        <span class="t-en">WebContainers stack four modern browser primitives.</span>
+        <span class="t-zh">WebContainers 建立在四項現代瀏覽器底層技術之上。</span>
+      </p>
+      <div class="arch-grid">
+        <div class="arch-card">
+          <div class="arch-label">Layer 1</div>
+          <h3>WebAssembly (WASM)</h3>
+          <p>
+            <span class="t-en"
+              >The Node.js runtime binary (C/C++) can't run in browsers directly — browsers only execute JavaScript and
+              WASM. So the C/C++ parts are compiled to WASM; Node.js's built-in JS modules still run in the browser's
+              own V8, avoiding double-VM overhead. OS-level calls like <code>open</code> and <code>fork</code> are
+              intercepted and re-implemented with browser APIs.</span
+            ><span class="t-zh"
+              >Node.js 的 runtime binary 以 C/C++ 撰寫，瀏覽器無法直接執行——瀏覽器只能跑 JavaScript 與 WASM。因此 C/C++
+              部分編譯為 WASM，Node.js 的 JavaScript 內建模組仍由瀏覽器原生 V8
+              執行，無雙重虛擬機損耗。<code>open</code>、<code>fork</code> 等 OS 呼叫則被攔截並以瀏覽器 API
+              重新實作。</span
+            >
+          </p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-label">Layer 2</div>
+          <h3>SharedArrayBuffer &amp; Atomics</h3>
+          <p>
+            <span class="t-en"
+              ><code>SharedArrayBuffer</code> is a block of memory shared across Workers — any Worker can read or write
+              it directly, with no message-passing overhead. <code>Atomics</code> provides synchronization on top:
+              <code>Atomics.wait()</code> blocks a Worker until notified, and <code>Atomics.notify()</code> wakes it up.
+              Together they let WebContainers emulate synchronous blocking calls (e.g. <code>readFileSync</code>) across
+              Worker boundaries.</span
+            ><span class="t-zh"
+              ><code>SharedArrayBuffer</code> 是可跨 Worker 共享的記憶體區塊——任何 Worker
+              都能直接讀寫，無需訊息傳遞。<code>Atomics</code> 在此之上提供同步機制：<code>Atomics.wait()</code> 讓
+              Worker 阻塞等待，<code>Atomics.notify()</code> 將其喚醒。兩者合力讓 WebContainers 能在跨 Worker
+              的環境中模擬 Node.js 同步阻塞呼叫（如 <code>readFileSync</code>）。</span
+            >
+          </p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-label">Layer 3</div>
+          <h3>Service Worker</h3>
+          <p>
+            <span class="t-en"
+              >The container's HTTP server has no real TCP port — it runs inside a WASM Worker. When a port opens,
+              WebContainers generates a unique HTTPS proxy URL (e.g. <code>*.webcontainer-api.io</code>) for it. The
+              Service Worker intercepts <code>fetch</code> requests to that URL, forwards them to the WASM Worker, and
+              returns the response — so the <code>&lt;iframe&gt;</code> behaves as if it's talking to a real
+              server.</span
+            ><span class="t-zh"
+              >容器內的 HTTP 伺服器沒有真實 TCP 連接埠，跑在 WASM Worker 裡。當 port 開啟時，WebContainers
+              會為它產生一個專屬的 HTTPS 代理網址（如 <code>*.webcontainer-api.io</code>）。Service Worker
+              攔截送往該網址的 <code>fetch</code> 請求，轉發給 WASM Worker 並回傳回應——<code>&lt;iframe&gt;</code>
+              的行為就像在存取一個真實的伺服器。</span
+            >
+          </p>
+        </div>
+        <div class="arch-card">
+          <div class="arch-label">Layer 4</div>
+          <h3>Web Workers</h3>
+          <p>
+            <span class="t-en"
+              >Browsers run JS on a single main thread — any blocking operation freezes the UI. WebContainers gives each
+              spawned process its own Web Worker, enabling true parallelism (e.g. running a dev server and
+              <code>npm install</code> simultaneously). The WASM runtime must also run in a Worker because
+              <code>Atomics.wait()</code> — required by Layer 2 — is forbidden on the main thread.</span
+            ><span class="t-zh"
+              >瀏覽器的 JS 預設只有一條主執行緒，任何阻塞操作都會導致畫面卡住。WebContainers 為每個子 Process 配置獨立的
+              Web Worker，實現真正的平行執行（例如同時跑 dev server 與 <code>npm install</code>）。WASM runtime
+              也必須跑在 Worker 裡，因為 Layer 2 依賴的 <code>Atomics.wait()</code> 在主執行緒中是被禁用的。</span
+            >
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ SLIDE 5 — Demo ═══════════════════════════════════════ -->
+    <section class="slide" id="slide-5" aria-label="Slide 5 of 12" aria-hidden="true">
+      <div
+        style="
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          gap: 2rem;
+          text-align: center;
+        "
+      >
+        <h2>
+          <span class="t-en">Demo <span class="grad">Time</span></span>
+          <span class="t-zh">立即<span class="grad">體驗</span></span>
+        </h2>
+        <p style="max-width: 40ch; color: var(--text-muted)">
+          <span class="t-en">A minimal in-browser IDE — WebContainers boots a real Node.js runtime and mounts a live Express app, all inside the browser tab.</span>
+          <span class="t-zh">一個極簡的瀏覽器內 IDE：WebContainers 啟動真實的 Node.js 執行環境，並掛載一個可即時編輯的 Express 應用程式，完全在瀏覽器分頁中運行。</span>
+        </p>
+        <a
+          href="/"
+          target="_blank"
+          rel="noopener"
+          class="cta-btn"
+          style="
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.85rem 2.2rem;
+            background: linear-gradient(135deg, var(--accent), var(--cyan));
+            color: #fff;
+            font-weight: 600;
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            border-radius: 999px;
+            text-decoration: none;
+            box-shadow: 0 4px 24px rgba(108, 99, 255, 0.4);
+            transition: opacity 0.2s;
+          "
+        >
+          <span class="t-en">Open Demo ↗</span>
+          <span class="t-zh">開啟 Demo ↗</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- ══ SLIDE 6 — How It Works ═══════════════════════════════ -->
+    <section class="slide" id="slide-6" aria-label="Slide 6 of 12" aria-hidden="true">
+      <h2>
+        <span class="t-en">How It <span class="grad">Works</span></span>
+        <span class="t-zh">運作<span class="grad">原理</span></span>
+      </h2>
+      <p class="mt-xs">
+        <span class="t-en">Four lifecycle steps — from zero to a running server in the browser.</span>
+        <span class="t-zh">四個生命週期階段，帶你從零開始在瀏覽器中啟動一台伺服器。</span>
+      </p>
+      <div class="pipeline">
+        <div class="pipe-step">
+          <div class="pipe-bar"></div>
+          <div class="pipe-body">
+            <div class="pipe-num">STEP 01</div>
+            <div class="pipe-icon">⚡</div>
+            <h3><span class="t-en">Boot</span><span class="t-zh">啟動</span></h3>
+            <p><code>WebContainer.boot()</code></p>
+            <p style="margin-top: 0.3rem">
+              <span class="t-en">Initializes the WASM runtime. One call per page load.</span
+              ><span class="t-zh">初始化 WASM 執行環境，每次頁面載入只需呼叫一次。</span>
+            </p>
+          </div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step">
+          <div class="pipe-bar"></div>
+          <div class="pipe-body">
+            <div class="pipe-num">STEP 02</div>
+            <div class="pipe-icon">📁</div>
+            <h3><span class="t-en">Mount</span><span class="t-zh">掛載</span></h3>
+            <p><code>container.mount(tree)</code></p>
+            <p style="margin-top: 0.3rem">
+              <span class="t-en">Write a FileSystemTree snapshot into the virtual FS.</span
+              ><span class="t-zh">將 FileSystemTree 物件快照載入至虛擬檔案系統。</span>
+            </p>
+          </div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step">
+          <div class="pipe-bar"></div>
+          <div class="pipe-body">
+            <div class="pipe-num">STEP 03</div>
+            <div class="pipe-icon">🐚</div>
+            <h3><span class="t-en">Spawn</span><span class="t-zh">建立 Process</span></h3>
+            <p><code>container.spawn('jsh')</code></p>
+            <p style="margin-top: 0.3rem">
+              <span class="t-en">Start a shell or Node process. Streams stdin/stdout.</span
+              ><span class="t-zh">啟動 Shell 或 Node Process，以串流方式傳輸 stdin／stdout。</span>
+            </p>
+          </div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step">
+          <div class="pipe-bar"></div>
+          <div class="pipe-body">
+            <div class="pipe-num">STEP 04</div>
+            <div class="pipe-icon">🌐</div>
+            <h3><span class="t-en">Preview</span><span class="t-zh">預覽</span></h3>
+            <p><code>'server-ready'</code></p>
+            <p style="margin-top: 0.3rem">
+              <span class="t-en">A proxy URL is emitted when a port opens.</span
+              ><span class="t-zh">伺服器啟動後觸發事件，取得可載入 iframe 的網址。</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ SLIDE 5 — Virtual Filesystem ════════════════════════ -->
+    <section class="slide" id="slide-7" aria-label="Slide 7 of 12" aria-hidden="true">
+      <h2>
+        <span class="t-en">Virtual <span class="grad">Filesystem</span></span>
+        <span class="t-zh">虛擬<span class="grad">檔案系統</span></span>
+      </h2>
+      <p class="mt-xs">
+        <span class="t-en"
+          >An in-memory FS inside the WASM runtime — shared between host JS and the Node.js process, never touching the
+          host disk.</span
+        >
+        <span class="t-zh"
+          >存在於 WASM runtime 記憶體內的檔案系統，Host JS 與 Node.js process 共用同一份，完全不存取主機磁碟。</span
+        >
+      </p>
+      <div class="fs-layout">
+        <!-- Left: how it works -->
+        <div>
+          <div style="display: flex; flex-direction: column; gap: 0.28rem; margin-bottom: 1rem">
+            <div class="net-box accent" style="text-align: center">
+              <span class="t-en">Host JS &nbsp;·&nbsp; <code>container.fs.*</code></span>
+              <span class="t-zh">Host JS &nbsp;·&nbsp; <code>container.fs.*</code></span>
+            </div>
+            <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem">
+              ↕ &nbsp;SharedArrayBuffer / postMessage
+            </div>
+            <div class="net-box cyan" style="text-align: center">
+              <span class="t-en">Virtual FS &nbsp;·&nbsp; RAM (WASM memory)</span>
+              <span class="t-zh">虛擬 FS &nbsp;·&nbsp; RAM（WASM 記憶體）</span>
+            </div>
+            <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem">
+              ↕ &nbsp;Node.js <code>fs</code> shim
+            </div>
+            <div class="net-box accent" style="text-align: center">
+              <span class="t-en"
+                >Node.js process &nbsp;·&nbsp; <code>fs.readFile</code> / <code>fs.writeFile</code></span
+              >
+              <span class="t-zh"
+                >Node.js process &nbsp;·&nbsp; <code>fs.readFile</code> / <code>fs.writeFile</code></span
+              >
+            </div>
+          </div>
+          <ul class="bullets">
+            <li>
+              <span class="t-en"
+                >Both sides access the <em>same</em> FS — writes are instantly visible to the other</span
+              ><span class="t-zh">兩側存取的是<em>同一份</em> FS，任一側的寫入對另一側立即可見</span>
+            </li>
+            <li>
+              <span class="t-en">File watchers fire on any change, from either side</span
+              ><span class="t-zh">任一側的變更都會觸發 file watcher</span>
+            </li>
+            <li>
+              <span class="t-en"><strong>Ephemeral</strong> — RAM only; lost when the tab closes.</span
+              ><span class="t-zh"><strong>揮發性</strong> — 僅存於記憶體，關閉分頁即消失。</span>
+            </li>
+          </ul>
+        </div>
+        <!-- Right: API reference + code example -->
+        <div style="display: flex; flex-direction: column; gap: 0.75rem">
+          <div class="code-card">
+            <div class="code-tab">container.fs API</div>
+            <div
+              style="
+                padding: 0.7rem 1rem 0.75rem;
+                display: flex;
+                flex-direction: column;
+                gap: 0.28rem;
+                font-family: var(--font-mono);
+                font-size: 0.78rem;
+              "
+            >
+              <div>
+                <code>container.<span style="color: var(--accent)">mount</span>(tree)</code>
+                <span class="muted"
+                  ><span class="t-en">— initialize FS from a FileSystemTree object</span
+                  ><span class="t-zh">— 以 FileSystemTree 物件初始化整份 FS</span></span
+                >
+              </div>
+              <div style="height: 0.3rem"></div>
+              <div>
+                <code>container.fs.<span style="color: var(--accent)">readFile</span>(path)</code>
+                <span class="muted"
+                  ><span class="t-en">— returns <code>Uint8Array</code> or string</span
+                  ><span class="t-zh">— 回傳 <code>Uint8Array</code> 或字串</span></span
+                >
+              </div>
+              <div>
+                <code>container.fs.<span style="color: var(--accent)">writeFile</span>(path, data)</code>
+                <span class="muted"
+                  ><span class="t-en">— write or overwrite a file</span
+                  ><span class="t-zh">— 寫入或覆寫指定檔案</span></span
+                >
+              </div>
+              <div>
+                <code>container.fs.<span style="color: var(--accent)">mkdir</span>(path)</code>
+                <span class="muted"
+                  ><span class="t-en">— create directories recursively</span
+                  ><span class="t-zh">— 遞迴建立目錄結構</span></span
+                >
+              </div>
+              <div>
+                <code>container.fs.<span style="color: var(--accent)">rm</span>(path)</code>
+                <span class="muted"
+                  ><span class="t-en">— remove files or directories</span
+                  ><span class="t-zh">— 刪除檔案或目錄</span></span
+                >
+              </div>
+              <div>
+                <code>container.fs.<span style="color: var(--accent)">watch</span>(path, cb)</code>
+                <span class="muted"
+                  ><span class="t-en">— observe changes (like Node's <code>fs.watch</code>)</span
+                  ><span class="t-zh">— 監聽變更（同 Node.js <code>fs.watch</code>）</span></span
+                >
+              </div>
+            </div>
+          </div>
+          <div class="code-card">
+            <div class="code-tab">
+              <span class="t-en">Loading a FileSystemTree</span><span class="t-zh">載入 FileSystemTree 的方式</span>
+            </div>
+            <pre><span class="tok-cm">// 1. Hardcoded  (FileSystemTree object)</span>
+<span class="tok-kw">await</span> container.<span class="tok-fn">mount</span>({ <span class="tok-str">'index.js'</span>: { file: { contents: src } } });
+
+<span class="tok-cm">// 2. From an API  (server returns FileSystemTree as JSON)</span>
+<span class="tok-kw">const</span> tree = <span class="tok-kw">await</span> <span class="tok-fn">fetch</span>(<span class="tok-str">'/api/project'</span>).<span class="tok-fn">then</span>(r => r.<span class="tok-fn">json</span>());
+<span class="tok-kw">await</span> container.<span class="tok-fn">mount</span>(tree);
+
+<span class="tok-cm">// 3. Snapshot  (@webcontainer/snapshot — binary, recommended)</span>
+<span class="tok-cm">// server: import { snapshot } from '@webcontainer/snapshot'</span>
+<span class="tok-cm">//         res.send(await snapshot('./my-project'))</span>
+<span class="tok-kw">const</span> buf = <span class="tok-kw">await</span> <span class="tok-fn">fetch</span>(<span class="tok-str">'/snapshot'</span>).<span class="tok-fn">then</span>(r => r.<span class="tok-fn">arrayBuffer</span>());
+<span class="tok-kw">await</span> container.<span class="tok-fn">mount</span>(buf); <span class="tok-cm">// mount() accepts ArrayBuffer directly</span>
+
+</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ SLIDE 6 — Process & Shell API ══════════════════════ -->
+    <section class="slide" id="slide-8" aria-label="Slide 8 of 12" aria-hidden="true">
+      <h2>
+        <span class="t-en">Process &amp; <span class="grad">Shell</span> API</span>
+        <span class="t-zh">Process 與 <span class="grad">Shell</span> API</span>
+      </h2>
+      <p class="mt-xs">
+        <span class="t-en"
+          ><code>spawn()</code> forks a real process inside the Service Worker sandbox — its I/O is bridged back to the
+          browser as Web Streams.</span
+        >
+        <span class="t-zh"
+          ><code>spawn()</code> 在 Service Worker 沙盒中 fork 真實 process，I/O 透過 Web Streams 傳回主頁面。</span
+        >
+      </p>
+
+      <!-- Diagram + API (left) + code (right) -->
+      <div class="proc-layout" style="margin-top: 0.75rem">
+        <!-- Left: diagram (top) + API card (bottom) -->
+        <div>
+          <!-- I/O flow diagram -->
+          <div style="display: flex; flex-direction: column; gap: 0.28rem; margin-bottom: 0.8rem">
+            <div class="net-box accent" style="text-align: center; padding: 0.5rem 0.75rem">
+              <div
+                style="
+                  font-size: 0.6rem;
+                  letter-spacing: 0.06em;
+                  text-transform: uppercase;
+                  opacity: 0.7;
+                  margin-bottom: 0.25rem;
+                "
+              >
+                <span class="t-en">Browser — main thread</span><span class="t-zh">瀏覽器主執行緒</span>
+              </div>
+              <code style="color: inherit">xterm.js</code>
+            </div>
+            <div style="text-align: center; color: var(--text-muted); font-size: 0.76rem">
+              keystrokes ↓ WritableStream &nbsp;·&nbsp; ReadableStream ↑ output
+            </div>
+            <div class="net-box cyan" style="text-align: center; padding: 0.5rem 0.75rem">
+              <div
+                style="
+                  font-size: 0.6rem;
+                  letter-spacing: 0.06em;
+                  text-transform: uppercase;
+                  opacity: 0.7;
+                  margin-bottom: 0.25rem;
+                "
+              >
+                <span class="t-en">Service Worker — sandbox</span><span class="t-zh">Service Worker 沙盒</span>
+              </div>
+              <code style="color: inherit">npm</code>&nbsp;·&nbsp;<code style="color: inherit">node</code
+              >&nbsp;·&nbsp;<code style="color: inherit">jsh</code>
+            </div>
+          </div>
+          <!-- API reference -->
+          <div class="code-card" style="margin-top: 0.8rem">
+            <div class="code-tab">WebContainerProcess</div>
+            <div
+              style="
+                padding: 0.7rem 1rem 0.75rem;
+                display: flex;
+                flex-direction: column;
+                gap: 0.28rem;
+                font-family: var(--font-mono);
+                font-size: 0.78rem;
+              "
+            >
+              <div>
+                <code>shell.<span style="color: var(--cyan)">output</span></code>
+                <span class="muted"
+                  ><span class="t-en">— ReadableStream of stdout + stderr</span
+                  ><span class="t-zh">— stdout＋stderr 的 ReadableStream</span></span
+                >
+              </div>
+              <div>
+                <code
+                  >shell.<span style="color: var(--accent)">input</span>.<span style="color: var(--accent)"
+                    >getWriter</span
+                  >()</code
+                >
+                <span class="muted"
+                  ><span class="t-en">— WritableStream writer for stdin</span
+                  ><span class="t-zh">— stdin 的 WritableStream writer</span></span
+                >
+              </div>
+              <div style="height: 0.3rem"></div>
+              <div>
+                <code>shell.<span style="color: var(--accent)">exit</span></code>
+                <span class="muted"
+                  ><span class="t-en">— Promise resolving with exit code</span
+                  ><span class="t-zh">— 解析為離開代碼的 Promise</span></span
+                >
+              </div>
+              <div>
+                <code>shell.<span style="color: var(--accent)">kill</span>()</code>
+                <span class="muted"
+                  ><span class="t-en">— send SIGTERM to terminate</span
+                  ><span class="t-zh">— 送出 SIGTERM 終止 process</span></span
+                >
+              </div>
+              <div>
+                <code>shell.<span style="color: var(--accent)">resize</span>({ cols, rows })</code>
+                <span class="muted"
+                  ><span class="t-en">— update terminal dimensions</span
+                  ><span class="t-zh">— 更新終端機尺寸</span></span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Right: code card -->
+        <div class="code-card">
+          <div class="code-tab">
+            <span class="t-en">spawn('jsh') — interactive shell</span>
+            <span class="t-zh">spawn('jsh')——互動式 Shell</span>
+          </div>
+          <pre><span class="tok-kw">const</span> shell = <span class="tok-kw">await</span> container
+  .<span class="tok-fn">spawn</span>(<span class="tok-str">'jsh'</span>, {
+    terminal: { cols, rows }
+  });
+
+<span class="tok-cm">// stdout → xterm.js</span>
+shell.output.<span class="tok-fn">pipeTo</span>(
+  <span class="tok-kw">new</span> <span class="tok-cls">WritableStream</span>({
+    write(data) { terminal.<span class="tok-fn">write</span>(data); }
+  })
+);
+
+<span class="tok-cm">// xterm.js keystrokes → stdin</span>
+<span class="tok-kw">const</span> input = shell.input.<span class="tok-fn">getWriter</span>();
+terminal.<span class="tok-fn">onData</span>((data) => {
+  input.<span class="tok-fn">write</span>(data);
+});</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ SLIDE 7 — Networking ════════════════════════════════ -->
+    <section class="slide" id="slide-9" aria-label="Slide 9 of 12" aria-hidden="true">
+      <h2>
+        <span class="t-en"><span class="grad">Networking</span> &amp; server-ready</span>
+        <span class="t-zh"><span class="grad">網路</span>與 server-ready 事件</span>
+      </h2>
+      <p class="mt-xs">
+        <span class="t-en"
+          >Servers inside the container are reachable from the host page via a Service Worker proxy.</span
+        >
+        <span class="t-zh">容器內的伺服器可透過 Service Worker 代理，從外層頁面直接存取。</span>
+      </p>
+      <div class="net-layout">
+        <div>
+          <ul class="bullets" style="margin-bottom: 1rem">
+            <li>
+              <span class="t-en"
+                >When a process binds a port, the <code>'server-ready'</code> event fires with a
+                <strong>proxy URL</strong></span
+              ><span class="t-zh"
+                >Process 監聽連接埠後，<code>'server-ready'</code> 事件隨即觸發，並回傳對應的<strong
+                  >代理網址</strong
+                ></span
+              >
+            </li>
+            <li>
+              <span class="t-en"
+                >A <strong>Service Worker</strong> intercepts requests to that origin and forwards them in-process</span
+              ><span class="t-zh"
+                ><strong>Service Worker</strong> 攔截對該來源的請求，並在容器 Process 內部轉發處理</span
+              >
+            </li>
+            <li>
+              <span class="t-en"
+                >Load the URL in an <code>&lt;iframe&gt;</code> for a live preview from the same page</span
+              ><span class="t-zh">將網址載入 <code>&lt;iframe&gt;</code>，即可在同一頁面內即時預覽執行結果</span>
+            </li>
+            <li>
+              <span class="t-en">Multiple ports supported — each gets its own proxy URL</span
+              ><span class="t-zh">支援多個連接埠同時監聽，各自擁有獨立的代理網址</span>
+            </li>
+          </ul>
+          <div class="code-card">
+            <div class="code-tab">server-ready event</div>
+            <pre>container.<span class="tok-fn">on</span>(<span class="tok-str">'server-ready'</span>,
+  (port, url) =&gt; {
+    <span class="tok-cm">// url is the proxy URL</span>
+    iframe.src = url;
+  }
+);</pre>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.28rem">
+          <div class="net-box accent" style="text-align: center">
+            <span class="t-en"
+              >Browser tab &nbsp;·&nbsp;
+              <code style="color: inherit">&lt;iframe src="*.webcontainer-api.io"&gt;</code></span
+            >
+            <span class="t-zh"
+              >瀏覽器分頁 &nbsp;·&nbsp;
+              <code style="color: inherit">&lt;iframe src="*.webcontainer-api.io"&gt;</code></span
+            >
+          </div>
+          <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem">
+            ↕ &nbsp;<span class="t-en">Service Worker intercepts &amp; forwards</span
+            ><span class="t-zh">Service Worker 攔截並轉發</span>
+          </div>
+          <div class="net-box cyan" style="text-align: center">
+            <span class="t-en">WebContainer runtime (WASM)</span><span class="t-zh">WebContainer 隔離環境（WASM）</span>
+          </div>
+          <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem">
+            ↕ &nbsp;<span class="t-en">routes to port 3111</span><span class="t-zh">轉發至連接埠 3111</span>
+          </div>
+          <div class="net-box green" style="text-align: center">
+            <span class="t-en">Express server process</span><span class="t-zh">Express 伺服器 Process</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ SLIDE 8 — Cross-Origin Isolation ════════════════════ -->
+    <section class="slide" id="slide-10" aria-label="Slide 10 of 12" aria-hidden="true">
+      <h2>
+        <span class="t-en">Cross-Origin <span class="grad">Isolation</span></span>
+        <span class="t-zh">跨來源<span class="grad">隔離</span></span>
+      </h2>
+      <div class="two-col">
+        <div>
+          <p class="mt-xs">
+            <span class="t-en"
+              >After Spectre/Meltdown attacks (2018), browsers disabled <code>SharedArrayBuffer</code> by default as a
+              side-channel mitigation. <code>Cross-Origin-Opener-Policy</code> (COOP) +
+              <code>Cross-Origin-Embedder-Policy</code> (COEP) signal that the page is cross-origin isolated — the
+              browser then re-enables <code>SharedArrayBuffer</code>, which WebContainers depends on for synchronous
+              Node.js APIs. Without these headers, <code>WebContainer.boot()</code> throws immediately.</span
+            >
+            <span class="t-zh"
+              >2018 年 Spectre/Meltdown 攻擊事件後，瀏覽器預設停用
+              <code>SharedArrayBuffer</code> 以防範旁路攻擊（side-channel attack）。</span
+            >
+          </p>
+          <p class="t-zh" style="margin-top: 0.5rem">設定
+              <code>Cross-Origin-Opener-Policy</code>（COOP）+
+              <code>Cross-Origin-Embedder-Policy</code>（COEP）標頭可向瀏覽器宣告頁面已完成跨來源隔離，瀏覽器才會重新啟用 <code>SharedArrayBuffer</code>——這正是
+              WebContainers 實作 Node.js 同步 API 的基礎。</p>
+          </p>
+          <p class="t-zh" style="margin-top: 0.5rem">缺少這兩個標頭，<code>WebContainer.boot()</code> 將直接拋出例外。</p>
+        </div>
+        <div>
+          <div class="code-card">
+            <pre><span class="tok-prop">Cross-Origin-Opener-Policy</span>: <span class="tok-str">same-origin</span>
+<span class="tok-prop">Cross-Origin-Embedder-Policy</span>: <span class="tok-str">require-corp</span></pre>
+          </div>
+          <div class="warn-badge" style="margin-top: 1rem">
+            ⚠
+            <span class="t-en"
+              >COEP blocks cross-origin subresources (images, fonts, scripts…) unless they respond with
+              <code style="color: #ffc840; background: transparent; padding: 0"
+                >Cross-Origin-Resource-Policy: cross-origin</code
+              >. CDN assets without this header will fail to load.</span
+            ><span class="t-zh"
+              >COEP 會封鎖所有跨來源子資源（圖片、字型、script…），除非該資源回應中包含
+              <code style="color: #ffc840; background: transparent; padding: 0"
+                >Cross-Origin-Resource-Policy: cross-origin</code
+              >。 未加此標頭的 CDN 資源將無法載入。</span
+            >
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ SLIDE 9 — Use Cases ══════════════════════════════════ -->
+    <section class="slide" id="slide-11" aria-label="Slide 11 of 12" aria-hidden="true">
+      <h2>
+        <span class="t-en">WebContainer Use <span class="grad">Cases</span></span>
+        <span class="t-zh">WebContainer 應用<span class="grad">場景</span></span>
+      </h2>
+      <p class="mt-xs">
+        <span class="t-en">Any environment that benefits from an isolated, zero-setup Node.js runtime.</span>
+        <span class="t-zh">凡是需要隔離、免安裝的 Node.js 執行環境，都是 WebContainers 的舞台。</span>
+      </p>
+      <div class="usecases-grid">
+        <div class="uc">
+          <div class="uc-icon">🖥️</div>
+          <div class="uc-body">
+            <h3><span class="t-en">Online IDEs</span><span class="t-zh">線上 IDE</span></h3>
+            <p>
+              <span class="t-en">VS Code-like tools with no backend. Each tab is its own isolated runtime.</span
+              ><span class="t-zh"
+                >無需後端基礎設施，打造類 VS Code 的開發工具，每個分頁各自擁有完全隔離的執行環境。</span
+              >
+            </p>
+          </div>
+        </div>
+        <div class="uc">
+          <div class="uc-icon">📚</div>
+          <div class="uc-body">
+            <h3><span class="t-en">Interactive Docs</span><span class="t-zh">互動式文件</span></h3>
+            <p>
+              <span class="t-en"
+                >Runnable code samples embedded in docs. Readers edit and run without leaving the page.</span
+              ><span class="t-zh">在文件中直接嵌入可執行的程式碼範例，讀者不必離開頁面就能即時編輯與執行。</span>
+            </p>
+          </div>
+        </div>
+        <div class="uc">
+          <div class="uc-icon">🔒</div>
+          <div class="uc-body">
+            <h3><span class="t-en">Code Sandboxes</span><span class="t-zh">程式碼沙盒</span></h3>
+            <p>
+              <span class="t-en">Isolated environments for coding challenges and interviews with real npm support.</span
+              ><span class="t-zh">為程式競賽、技術面試等場景提供支援真實 npm 的隔離執行環境。</span>
+            </p>
+          </div>
+        </div>
+        <div class="uc">
+          <div class="uc-icon">🔗</div>
+          <div class="uc-body">
+            <h3><span class="t-en">Shareable Demos</span><span class="t-zh">即開即用的展示連結</span></h3>
+            <p>
+              <span class="t-en">A running app as a URL — no deployment pipeline, no server costs.</span
+              ><span class="t-zh">以一條網址分享正在執行的應用程式，無需部署流程，也不需要任何伺服器費用。</span>
+            </p>
+          </div>
+        </div>
+        <div class="uc">
+          <div class="uc-icon">🤖</div>
+          <div class="uc-body">
+            <h3><span class="t-en">AI Coding Agents</span><span class="t-zh">AI 程式設計代理人</span></h3>
+            <p>
+              <span class="t-en"
+                >Give LLMs a sandboxed Node.js environment to write, run, and iterate on code safely.</span
+              ><span class="t-zh"
+                >為大型語言模型提供沙盒化的 Node.js 執行環境，讓 AI 能安全地撰寫、執行並反覆迭代程式碼。</span
+              >
+            </p>
+          </div>
+        </div>
+        <div class="uc">
+          <div class="uc-icon">🧪</div>
+          <div class="uc-body">
+            <h3><span class="t-en">Browser-based CI</span><span class="t-zh">瀏覽器端 CI</span></h3>
+            <p>
+              <span class="t-en">Run tests and builds client-side. No CI server, no queue — instant feedback.</span
+              ><span class="t-zh">直接在瀏覽器端執行測試與建置，無需 CI 伺服器，也不用排隊等待，立即獲得回饋。</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ Slide 12 — Thank You ══════════════════════════════════ -->
+    <section class="slide" id="slide-12" aria-label="Slide 12 of 12" aria-hidden="true">
+      <div class="thank-you-wrap">
+        <h2>
+          <span class="t-en">Thank <span class="grad">You</span></span>
+          <span class="t-zh">感謝<span class="grad">聆聽</span></span>
+        </h2>
+        <p class="ty-sub">Made with 🩷 by Michelle</p>
+      </div>
+    </section>
+
+    <!-- ══ HUD ══════════════════════════════════════════════════ -->
+    <nav class="controls" aria-label="Slide navigation">
+      <button id="btn-prev" aria-label="Previous slide">&#8592;</button>
+      <span id="slide-counter" aria-live="polite"
+        ><input id="page-input" type="number" min="1" aria-label="Go to slide" /><span class="page-sep"> / </span
+        ><span id="page-total"></span
+      ></span>
+      <button id="btn-next" aria-label="Next slide">&#8594;</button>
+    </nav>
+    <div
+      class="progress-bar"
+      role="progressbar"
+      aria-valuenow="1"
+      aria-valuemin="1"
+      aria-valuemax="12"
+      aria-label="Slide progress"
+    >
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+
+    <script>
+      /* ── Slide navigation ─────────────────────────── */
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const total = slides.length;
+      let current = -1;
+      document.getElementById('page-total').textContent = total;
+
+      function goTo(index) {
+        const prev = current;
+        const next = Math.max(0, Math.min(index, total - 1));
+        if (prev === next) return;
+        const dir = next > prev ? 1 : -1;
+
+        if (prev >= 0) {
+          slides[prev].style.setProperty('--exit-dir', `${-dir * 24}px`);
+          slides[prev].removeAttribute('data-active');
+          slides[prev].setAttribute('data-exiting', '');
+          slides[prev].setAttribute('aria-hidden', 'true');
+          setTimeout(() => slides[prev].removeAttribute('data-exiting'), 400);
+        }
+
+        current = next;
+        slides[current].style.setProperty('--enter-dir', `${dir * 24}px`);
+        slides[current].setAttribute('data-active', '');
+        slides[current].removeAttribute('aria-hidden');
+
+        const label = `${current + 1} / ${total}`;
+        document.getElementById('page-input').value = current + 1;
+
+        document.getElementById('progress-fill').style.width = `${((current + 1) / total) * 100}%`;
+        document.querySelector('.progress-bar').setAttribute('aria-valuenow', String(current + 1));
+
+        document.getElementById('btn-prev').disabled = current === 0;
+        document.getElementById('btn-next').disabled = current === total - 1;
+      }
+
+      document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+          e.preventDefault();
+          goTo(current + 1);
+        }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          goTo(current - 1);
+        }
+        if (e.key === 'Home') {
+          e.preventDefault();
+          goTo(0);
+        }
+        if (e.key.toLowerCase() === 'q') {
+          e.preventDefault();
+          goTo(0);
+        }
+        if (e.key === 'End') {
+          e.preventDefault();
+          goTo(total - 1);
+        }
+      });
+
+      document.getElementById('btn-next').addEventListener('click', () => goTo(current + 1));
+      document.getElementById('btn-prev').addEventListener('click', () => goTo(current - 1));
+      const pageInput = document.getElementById('page-input');
+      pageInput.setAttribute('max', total);
+
+      function applyPageInput(v) {
+        if (v >= 1 && v <= total) goTo(v - 1);
+        else pageInput.value = current + 1;
+      }
+
+      pageInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          applyPageInput(parseInt(pageInput.value, 10));
+          pageInput.blur();
+        }
+        if (e.key === 'Escape') {
+          pageInput.value = current + 1;
+          pageInput.blur();
+        }
+      });
+
+      pageInput.addEventListener('input', () => {
+        pageInput.value = pageInput.value.replace(/[^0-9]/g, '');
+        if (pageInput.value.length > String(total).length)
+          pageInput.value = pageInput.value.slice(0, String(total).length);
+      });
+
+      pageInput.addEventListener('blur', () => {
+        applyPageInput(parseInt(pageInput.value, 10));
+      });
+
+      let touchStartX = 0;
+      document.addEventListener(
+        'touchstart',
+        (e) => {
+          touchStartX = e.changedTouches[0].screenX;
+        },
+        { passive: true },
+      );
+      document.addEventListener(
+        'touchend',
+        (e) => {
+          const dx = e.changedTouches[0].screenX - touchStartX;
+          if (Math.abs(dx) > 50) goTo(current + (dx < 0 ? 1 : -1));
+        },
+        { passive: true },
+      );
+
+      /* ── Language toggle ──────────────────────────── */
+      function setLang(lang) {
+        document.body.classList.toggle('zh', lang === 'zh');
+        document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+        document.getElementById('btn-zh').classList.toggle('active', lang === 'zh');
+        document.documentElement.lang = lang === 'zh' ? 'zh-TW' : 'en';
+      }
+
+      goTo(0);
+    </script>
+  </body>
+</html>
