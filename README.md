@@ -2,6 +2,8 @@
 
 A browser-based in-browser development environment built with React, TypeScript, and the [WebContainers API](https://webcontainers.io). It boots a Node.js runtime directly in the browser, runs an Express server inside it, and lets you edit the server code live with an integrated terminal and preview.
 
+Built following the [WebContainers official tutorial](https://webcontainers.io/tutorial/1-build-your-first-webcontainer-app).
+
 ## Features
 
 - **In-browser Node.js runtime** via WebContainers API
@@ -29,12 +31,12 @@ index.js        # Standalone Express server (used for local reference, not the i
 
 ## Scripts
 
-| Command | Description |
-|---|---|
-| `npm run dev` | Start Vite dev server |
+| Command         | Description                         |
+| --------------- | ----------------------------------- |
+| `npm run dev`   | Start Vite dev server               |
 | `npm run build` | Type-check and build for production |
-| `npm run lint` | Run ESLint |
-| `npm start` | Run `index.js` locally with nodemon |
+| `npm run lint`  | Run ESLint                          |
+| `npm start`     | Run `index.js` locally with nodemon |
 
 ## Requirements
 
