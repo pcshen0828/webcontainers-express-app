@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
 import '@xterm/xterm/css/xterm.css';
-import { WebContainer } from '@webcontainer/api';
+import { WebContainer, type FileNode } from '@webcontainer/api';
 import { files } from './files';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -12,7 +12,7 @@ const MIN_TERMINAL_HEIGHT = 80;
 
 function App() {
   const [webContainer, setWebContainer] = useState<WebContainer | null>(null);
-  const [content, setContent] = useState(files['index.js'].file.contents);
+  const [content, setContent] = useState((files['index.js'] as FileNode).file.contents as string);
   const [containerHeight, setContainerHeight] = useState(DEFAULT_CONTAINER_HEIGHT);
 
   const booted = useRef(false);

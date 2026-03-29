@@ -1,4 +1,6 @@
-export const files = {
+import type { FileSystemTree } from '@webcontainer/api';
+
+export const files: FileSystemTree = {
   'index.js': {
     file: {
       contents: `
