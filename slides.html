@@ -882,8 +882,67 @@
       </p>
     </section>
 
-    <!-- ══ SLIDE 2 — Why WebContainers? ════════════════════════ -->
+    <!-- ══ SLIDE 2 — What is WebContainers? ════════════════════ -->
     <section class="slide" id="slide-2" aria-label="Slide 2 of 12" aria-hidden="true">
+      <div class="two-col">
+        <div>
+          <h2>
+            <span class="t-en">What is<br /><span class="grad">WebContainers</span>?</span>
+            <span class="t-zh">什麼是<br /><span class="grad">WebContainers</span>？</span>
+          </h2>
+          <p class="lead" style="margin: 0.85rem 0 1.1rem">
+            <span class="t-en"
+              >A browser-native runtime that executes Node.js, npm, and shell commands entirely inside the browser tab.
+              Built by StackBlitz, it powers StackBlitz.com.</span
+            >
+            <span class="t-zh"
+              >一個瀏覽器原生的執行環境，可直接在瀏覽器分頁內執行 Node.js、npm 與 shell 指令，無需任何後端。由
+              StackBlitz 開發，為 StackBlitz.com 提供技術核心。</span
+            >
+          </p>
+          <ul class="bullets">
+            <li>
+              <span class="t-en">Runs a <strong>real Node.js</strong> runtime — not a polyfill or emulation</span
+              ><span class="t-zh">執行<strong>真正的 Node.js</strong> 執行環境，非模擬或 polyfill 替代實作</span>
+            </li>
+            <li>
+              <span class="t-en">Supports <strong>npm install</strong>, ESM, CJS, and native modules</span
+              ><span class="t-zh">支援 <strong>npm install</strong>、ESM、CJS 及原生模組</span>
+            </li>
+            <li>
+              <span class="t-en"><strong>Virtual filesystem</strong> — mount, read, write, watch files</span
+              ><span class="t-zh"><strong>虛擬檔案系統</strong>——掛載、讀寫與監控檔案變更</span>
+            </li>
+            <li>
+              <span class="t-en"><strong>POSIX-like shell</strong> (jsh) with full I/O streaming</span
+              ><span class="t-zh"><strong>類 POSIX Shell</strong>（jsh），提供完整的 I/O 串流支援</span>
+            </li>
+            <li>
+              <span class="t-en">Servers become reachable via a <strong>Service Worker proxy URL</strong></span
+              ><span class="t-zh">伺服器啟動後，Service Worker 會產生一個<strong>專屬代理網址</strong>供外部存取</span>
+            </li>
+          </ul>
+        </div>
+        <div class="term-mock">
+          <div class="term-bar">
+            <span class="term-dot r"></span><span class="term-dot y"></span><span class="term-dot g"></span>
+            <span class="term-label">WebContainer — jsh</span>
+          </div>
+          <div class="term-body">
+            <div><span class="term-prompt">$ </span><span class="term-cmd">node --version</span></div>
+            <div><span class="term-out">v22.0.0</span></div>
+            <div><span class="term-prompt">$ </span><span class="term-cmd">npm install express</span></div>
+            <div><span class="term-out">added 62 packages in 1.8s</span></div>
+            <div><span class="term-prompt">$ </span><span class="term-cmd">node index.js</span></div>
+            <div><span class="term-out">App is live at http://localhost:3111</span></div>
+            <div><span class="term-prompt">$ </span><span class="cursor"></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ SLIDE 3 — Why WebContainers? ════════════════════════ -->
+    <section class="slide" id="slide-3" aria-label="Slide 3 of 12" aria-hidden="true">
       <h2>
         <span class="t-en">The <span class="grad">Problem</span> with Traditional Approaches</span>
         <span class="t-zh">傳統方案的<span class="grad">痛點</span></span>
@@ -948,65 +1007,6 @@
           >已通過大規模驗證——驅動數百萬 StackBlitz 使用者，並支援 Svelte、Angular、Nuxt 的互動式官方文件。</span
         >
       </p>
-    </section>
-
-    <!-- ══ SLIDE 3 — What is WebContainers? ════════════════════ -->
-    <section class="slide" id="slide-3" aria-label="Slide 3 of 12" aria-hidden="true">
-      <div class="two-col">
-        <div>
-          <h2>
-            <span class="t-en">What is<br /><span class="grad">WebContainers</span>?</span>
-            <span class="t-zh">什麼是<br /><span class="grad">WebContainers</span>？</span>
-          </h2>
-          <p class="lead" style="margin: 0.85rem 0 1.1rem">
-            <span class="t-en"
-              >A browser-native runtime that executes Node.js, npm, and shell commands entirely inside the browser tab.
-              Built by StackBlitz, it powers StackBlitz.com.</span
-            >
-            <span class="t-zh"
-              >一個瀏覽器原生的執行環境，可直接在瀏覽器分頁內執行 Node.js、npm 與 shell 指令，無需任何後端。由
-              StackBlitz 開發，為 StackBlitz.com 提供技術核心。</span
-            >
-          </p>
-          <ul class="bullets">
-            <li>
-              <span class="t-en">Runs a <strong>real Node.js</strong> runtime — not a polyfill or emulation</span
-              ><span class="t-zh">執行<strong>真正的 Node.js</strong> 執行環境，非模擬或 polyfill 替代實作</span>
-            </li>
-            <li>
-              <span class="t-en">Supports <strong>npm install</strong>, ESM, CJS, and native modules</span
-              ><span class="t-zh">支援 <strong>npm install</strong>、ESM、CJS 及原生模組</span>
-            </li>
-            <li>
-              <span class="t-en"><strong>Virtual filesystem</strong> — mount, read, write, watch files</span
-              ><span class="t-zh"><strong>虛擬檔案系統</strong>——掛載、讀寫與監控檔案變更</span>
-            </li>
-            <li>
-              <span class="t-en"><strong>POSIX-like shell</strong> (jsh) with full I/O streaming</span
-              ><span class="t-zh"><strong>類 POSIX Shell</strong>（jsh），提供完整的 I/O 串流支援</span>
-            </li>
-            <li>
-              <span class="t-en">Servers become reachable via a <strong>Service Worker proxy URL</strong></span
-              ><span class="t-zh">伺服器啟動後，Service Worker 會產生一個<strong>專屬代理網址</strong>供外部存取</span>
-            </li>
-          </ul>
-        </div>
-        <div class="term-mock">
-          <div class="term-bar">
-            <span class="term-dot r"></span><span class="term-dot y"></span><span class="term-dot g"></span>
-            <span class="term-label">WebContainer — jsh</span>
-          </div>
-          <div class="term-body">
-            <div><span class="term-prompt">$ </span><span class="term-cmd">node --version</span></div>
-            <div><span class="term-out">v22.0.0</span></div>
-            <div><span class="term-prompt">$ </span><span class="term-cmd">npm install express</span></div>
-            <div><span class="term-out">added 62 packages in 1.8s</span></div>
-            <div><span class="term-prompt">$ </span><span class="term-cmd">node index.js</span></div>
-            <div><span class="term-out">App is live at http://localhost:3111</span></div>
-            <div><span class="term-prompt">$ </span><span class="cursor"></span></div>
-          </div>
-        </div>
-      </div>
     </section>
 
     <!-- ══ SLIDE 3 — How It Works ══════════════════════════════ -->
